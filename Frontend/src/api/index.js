@@ -5,7 +5,7 @@ const API_BASE_URL = 'http://localhost:5000/api'
 // 创建 axios 实例
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 300000, // 5 分钟超时 (300 秒)
+  timeout: 600000, // 5 分钟超时 (300 秒)
   headers: {
     'Content-Type': 'application/json'
   }
@@ -22,7 +22,7 @@ export async function uploadNovel(file) {
     headers: {
       'Content-Type': 'multipart/form-data'
     },
-    timeout: 300000 // 5 分钟超时
+    timeout: 600000 // 5 分钟超时
   })
 
   if (response.data.success) {
@@ -40,7 +40,7 @@ export async function uploadNovel(file) {
  */
 export async function getChapterGraph(chapterIndex) {
   const response = await api.get(`/chapter/${chapterIndex}`, {
-    timeout: 300000 // 5 分钟超时
+    timeout: 600000 // 5 分钟超时
   })
   return response.data
 }
