@@ -44,10 +44,8 @@ export default {
 
       chart.value = echarts.init(chartContainer.value)
 
-      // 窗口大小变化时重绘
       window.addEventListener('resize', handleResize)
 
-      // 点击事件
       chart.value.on('click', (params) => {
         if (params.dataType === 'node' && params.name) {
           emit('node-click', params.name)
@@ -140,3 +138,4 @@ export default {
   height: 100%;
 }
 </style>
+

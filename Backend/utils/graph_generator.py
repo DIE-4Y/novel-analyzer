@@ -70,9 +70,9 @@ class GraphGenerator:
 
             nodes.append({
                 'name': char,
-                'symbolSize': min(50, 20 + appear_count * 2),  # 根据出现次数调整节点大小
-                'value': degree,  # 度中心性（连接数）
-                'appearCount': appear_count,  # 实际出现次数
+                'symbolSize': min(50, 20 + appear_count * 2),
+                'value': degree,
+                'appearCount': appear_count,
                 'draggable': True
             })
 
@@ -111,14 +111,12 @@ class GraphGenerator:
         Returns:
             带颜色的图谱数据
         """
-        # 为每条边分配颜色
         colored_links = []
         for link in graph_data['links']:
             source = link['source']
             target = link['target']
 
-            # 查找这条边属于哪个阵营
-            color = '#aaa'  # 默认灰色
+            color = '#aaa'
             for faction_id, members in faction_colors.items():
                 if source in members and target in members:
                     color = self._get_faction_color(faction_id)
@@ -144,3 +142,4 @@ class GraphGenerator:
             '#98D8C8', '#F7DC6F', '#BB8FCE', '#F1948A'
         ]
         return colors[faction_id % len(colors)]
+

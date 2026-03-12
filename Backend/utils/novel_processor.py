@@ -85,18 +85,26 @@ class NovelProcessor:
         """提取全文人物并统计出现次数"""
         characters = {}
 
-        # 按段落分割
-        paragraphs = re.split(r'\n\s*\n', content)
+        # 智能段落分割：检测文本格式
+        # 如果存在大量连续空行，说明是有空行的格式
+        has_blank_lines = bool(re.search(r'\n\s*\n', content))
+
+        if has_blank_lines:
+            # 有空行格式（如十日终焉）
+            paragraphs = re.split(r'\n\s*\n', content)
+        else:
+            # 无空行格式（如仙工开物），按单行分割
+            paragraphs = content.split('\n')
 
         for paragraph in tqdm(paragraphs, desc="Extracting characters"):
-            paragraph = paragraph.strip().replace(" ", "")
+            paragraph = paragraph.strip()
             if not paragraph:
                 continue
 
             words = self.cut_text(paragraph)
 
             for word, flag in words:
-                if flag in ['nr', 'nrf']:  # 人名标记
+                if flag in ['nr', 'nrf']:
                     characters[word] = characters.get(word, 0) + 1
 
         return characters
@@ -108,19 +116,17 @@ class NovelProcessor:
         """
         # 定义章节标题正则（行首匹配，支持多种格式）
         chapter_pattern = re.compile(
-            r'^\s*(?:'  # 行首空白
-            r'第\s*[零一二三四五六七八九十百千万\d]+\s*[章节部卷]'  # 中文：第 X 章/节/部/卷
-            r'|Chapter\s+\d+'  # 英文 Chapter
-            r'|Part\s+\d+'  # Part
-            r'|SECTION\s+\d+'  # Section
-            r')[^\n]*',  # 匹配整行（到换行前）
+            r'^\s*(?:'
+            r'第\s*[零一二三四五六七八九十百千万\d]+\s*[章节部卷]'
+            r'|Chapter\s+\d+'
+            r'|Part\s+\d+'
+            r'|SECTION\s+\d+'
+            r')[^\n]*',
             re.IGNORECASE | re.MULTILINE
         )
 
-        # 找到所有匹配的章节标题
         matches = list(chapter_pattern.finditer(content))
 
-        # 如果没有匹配到任何章节，将全文作为一章
         if not matches:
             return [{
                 'index': 0,
@@ -130,12 +136,10 @@ class NovelProcessor:
                 'content': content
             }]
 
-        # 按匹配顺序构建章节
         chapters = []
         for i, match in enumerate(matches):
-            title = match.group(0).strip()  # 标题文本（去除首尾空白）
-            start = match.start()  # 标题起始位置
-            # 结束位置为下一个标题开始，若为最后一个则到文件末尾
+            title = match.group(0).strip()
+            start = match.start()
             end = matches[i + 1].start() if i + 1 < len(matches) else len(content)
 
             chapters.append({
@@ -143,7 +147,7 @@ class NovelProcessor:
                 'title': title,
                 'start': start,
                 'end': end,
-                'content': content[start:end]  # 包含标题行的完整章节内容
+                'content': content[start:end]
             })
 
         return chapters
@@ -155,10 +159,17 @@ class NovelProcessor:
 
         for chapter in chapters:
             chapter_content = chapter['content']
-            paragraphs = re.split(r'\n\s*\n', chapter_content)
 
-            for para_idx, paragraph in enumerate(paragraphs):
-                paragraph = paragraph.strip().replace(" ", "")
+            # 智能段落分割：检测文本格式
+            has_blank_lines = bool(re.search(r'\n\s*\n', chapter_content))
+
+            if has_blank_lines:
+                raw_paragraphs = re.split(r'\n\s*\n', chapter_content)
+            else:
+                raw_paragraphs = chapter_content.split('\n')
+
+            for para_idx, paragraph in enumerate(raw_paragraphs):
+                paragraph = paragraph.strip()
                 if not paragraph:
                     continue
 
@@ -198,3 +209,4 @@ class NovelProcessor:
             })
 
         return quotes
+
