@@ -17,13 +17,11 @@ class GraphGenerator:
         Returns:
             ECharts 格式的图谱数据
         """
-        # 获取该章节的所有段落
         chapter_paragraphs = [
             p for p in paragraphs_info
             if p['chapter_index'] == chapter_idx
         ]
 
-        # 收集该章节所有出现的人物及其出现次数
         all_characters = {}
         character_appear_count = defaultdict(int)
 
@@ -33,7 +31,7 @@ class GraphGenerator:
                 all_characters[char] = True
                 character_appear_count[char] += 1
 
-        # 如果没有人物，返回空图谱（但至少要有节点）
+        # 如果没有人物，返回空图谱
         if not all_characters:
             return {
                 'nodes': [],
@@ -48,7 +46,6 @@ class GraphGenerator:
 
         for para in chapter_paragraphs:
             chars = para['characters']
-            # 同一段落中出现的人物两两共现
             for i in range(len(chars)):
                 for j in range(i + 1, len(chars)):
                     char1, char2 = sorted([chars[i], chars[j]])
@@ -59,13 +56,10 @@ class GraphGenerator:
         character_list = list(all_characters.keys())
 
         for char in character_list:
-            # 计算人物的度（连接数）
             degree = sum(1 for other in cooccurrence_matrix[char] if cooccurrence_matrix[char][other] > 0)
-            # 统计在其他字符的共现中也出现的次数
             degree += sum(1 for other_char in cooccurrence_matrix
                          if char in cooccurrence_matrix[other_char] and cooccurrence_matrix[other_char][char] > 0)
 
-            # 获取该人物在章节中的出现次数
             appear_count = character_appear_count[char]
 
             nodes.append({

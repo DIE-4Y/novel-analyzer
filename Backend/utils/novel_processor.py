@@ -8,10 +8,8 @@ class NovelProcessor:
         """初始化 HanLP 分析器"""
         data_path = "C:/Users/faker/AppData/Local/Programs/Python/Python312/Lib/site-packages/pyhanlp/static/data/model/perceptron/large/cws.bin"
 
-        # CRF 分析器
         self.CRFLAnalyzer = JClass("com.hankcs.hanlp.model.crf.CRFLexicalAnalyzer")()
 
-        # 感知机分析器
         PLAnalyzer = JClass("com.hankcs.hanlp.model.perceptron.PerceptronLexicalAnalyzer")
         self.PLAnalyzer = PLAnalyzer(
             data_path,
@@ -48,20 +46,15 @@ class NovelProcessor:
         """处理小说文件，提取人物和章节信息"""
         content = self._read_file(filepath)
 
-        # 提取人物（全文）
         characters = self._extract_characters(content)
 
-        # 添加高频人物到词典
         high_freq_chars = [name for name, count in characters.items() if count >= 5]
         self.add_characters_to_dict(high_freq_chars)
 
-        # 重新处理（使用增强后的词典）
         characters = self._extract_characters(content)
 
-        # 划分章节
         chapters = self._split_chapters(content)
 
-        # 记录段落信息用于后续共现分析
         self.paragraphs_info = self._analyze_paragraphs(content, chapters)
 
         return {
@@ -73,7 +66,18 @@ class NovelProcessor:
         }
 
     def _read_file(self, filepath):
-        """读取文件内容"""
+        """读取文件内容，支持 txt 和 pdf 格式"""
+        file_ext = filepath.rsplit('.', 1)[1].lower()
+
+        if file_ext == 'txt':
+            return self._read_txt_file(filepath)
+        elif file_ext == 'pdf':
+            return self._read_pdf_file(filepath)
+        else:
+            raise ValueError(f'不支持的文件格式：{file_ext}')
+
+    def _read_txt_file(self, filepath):
+        """读取 TXT 文件"""
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 return f.read()
@@ -81,20 +85,46 @@ class NovelProcessor:
             with open(filepath, 'r', encoding='gbk') as f:
                 return f.read()
 
+    def _read_pdf_file(self, filepath):
+        """读取 PDF 文件，保留自然段结构"""
+        try:
+            import fitz
+
+            doc = fitz.open(filepath)
+
+            all_pages_text = []
+            found_text = False
+
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                text = page.get_text("text")
+
+                if text and text.strip():
+                    found_text = True
+                    cleaned_text = text.strip()
+                    all_pages_text.append(cleaned_text)
+
+            doc.close()
+
+            if not found_text:
+                return ""
+
+            full_text = "\n".join(all_pages_text)
+
+            full_text = re.sub(r'\n{3,}', '\n\n', full_text)
+
+            return full_text
+
+        except ImportError:
+            raise ImportError("需要安装 PyMuPDF 库：pip install PyMuPDF")
+        except Exception as e:
+            raise Exception(f"PDF 读取失败：{str(e)}")
+
     def _extract_characters(self, content):
         """提取全文人物并统计出现次数"""
         characters = {}
 
-        # 智能段落分割：检测文本格式
-        # 如果存在大量连续空行，说明是有空行的格式
-        has_blank_lines = bool(re.search(r'\n\s*\n', content))
-
-        if has_blank_lines:
-            # 有空行格式（如十日终焉）
-            paragraphs = re.split(r'\n\s*\n', content)
-        else:
-            # 无空行格式（如仙工开物），按单行分割
-            paragraphs = content.split('\n')
+        paragraphs = content.split('\n')
 
         for paragraph in tqdm(paragraphs, desc="Extracting characters"):
             paragraph = paragraph.strip()
@@ -114,7 +144,6 @@ class NovelProcessor:
         将小说内容按章节划分，返回章节列表。
         使用行首匹配的章节标题正则，支持中文和英文格式。
         """
-        # 定义章节标题正则（行首匹配，支持多种格式）
         chapter_pattern = re.compile(
             r'^\s*(?:'
             r'第\s*[零一二三四五六七八九十百千万\d]+\s*[章节部卷]'
@@ -160,20 +189,13 @@ class NovelProcessor:
         for chapter in chapters:
             chapter_content = chapter['content']
 
-            # 智能段落分割：检测文本格式
-            has_blank_lines = bool(re.search(r'\n\s*\n', chapter_content))
+            paragraphs = chapter_content.split('\n')
 
-            if has_blank_lines:
-                raw_paragraphs = re.split(r'\n\s*\n', chapter_content)
-            else:
-                raw_paragraphs = chapter_content.split('\n')
-
-            for para_idx, paragraph in enumerate(raw_paragraphs):
+            for para_idx, paragraph in enumerate(paragraphs):
                 paragraph = paragraph.strip()
                 if not paragraph:
                     continue
 
-                # 提取段落中的人物
                 chars_in_para = set()
                 words = self.cut_text(paragraph)
 
@@ -195,13 +217,11 @@ class NovelProcessor:
         """查找人物在指定章节的相关语句"""
         quotes = []
 
-        # 找到该章节的所有段落
         chapter_paragraphs = [
             p for p in paragraphs_info
             if p['chapter_index'] == chapter_idx and character_name in p['characters']
         ]
 
-        # 限制返回数量，最多 10 条
         for para_info in chapter_paragraphs[:10]:
             quotes.append({
                 'text': para_info['text'],

@@ -13,10 +13,8 @@ app = Flask(__name__)
 app.config.from_object(Config)
 CORS(app)
 
-# 确保上传目录存在
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
-# 全局变量存储处理结果
 processed_data = {
     'novel_content': None,
     'chapters': [],
@@ -49,23 +47,24 @@ def upload_file():
     file.save(filepath)
 
     try:
-        # 预处理小说，提取人物
         result = processor.process_novel(filepath)
 
-        # 存储处理结果
+        if not result['content'] or len(result['content'].strip()) == 0:
+            return jsonify({
+                'error': '无法从文件中提取有效文本内容，请检查文件是否为纯图片 PDF'
+            }), 400
+
         processed_data['novel_content'] = result['content']
         processed_data['chapters'] = result['chapters']
         processed_data['characters'] = result['characters']
         processed_data['paragraphs_info'] = result['paragraphs_info']
 
-        # 计算度中心性，找出主角
         main_chars = centrality_calc.calculate_main_characters(
             result['characters'],
             top_n=10
         )
         processed_data['main_characters'] = main_chars
 
-        # 生成第一章的人物关系图谱
         if len(result['chapters']) > 0:
             first_chapter_idx = result['chapter_indices'][0]
             graph_data = graph_generator.generate_chapter_graph(
@@ -74,7 +73,6 @@ def upload_file():
                 result['paragraphs_info']
             )
 
-            # 阵营分析并为连线着色
             faction_colors = faction_analyzer.analyze_factions(graph_data)
             graph_data_with_colors = graph_generator.apply_faction_colors(graph_data, faction_colors)
 
@@ -103,14 +101,12 @@ def get_chapter_graph(chapter_idx):
         return jsonify({'error': '请先上传文件'}), 400
 
     try:
-        # 重新生成该章节的图谱
         graph_data = graph_generator.generate_chapter_graph(
             processed_data['novel_content'],
             chapter_idx,
             processed_data['paragraphs_info']
         )
 
-        # 阵营分析并为连线着色
         faction_colors = faction_analyzer.analyze_factions(graph_data)
         graph_data_with_colors = graph_generator.apply_faction_colors(graph_data, faction_colors)
 
@@ -135,7 +131,6 @@ def get_character_quotes(character_name):
     try:
         chapter_idx = processed_data['current_graph'].get('chapter_index', 0)
 
-        # 查找该人物在章节中的相关语句
         quotes = processor.find_character_quotes(
             processed_data['novel_content'],
             character_name,
@@ -171,3 +166,4 @@ def allowed_file(filename):
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
+
