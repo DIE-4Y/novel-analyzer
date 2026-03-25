@@ -1,4 +1,4 @@
-import numpy as np
+import networkx as nx
 from collections import defaultdict
 
 class GraphGenerator:
@@ -22,13 +22,13 @@ class GraphGenerator:
             if p['chapter_index'] == chapter_idx
         ]
 
-        all_characters = {}
+        all_characters = set()
         character_appear_count = defaultdict(int)
 
         for para in chapter_paragraphs:
             chars = para['characters']
             for char in chars:
-                all_characters[char] = True
+                all_characters.add(char)
                 character_appear_count[char] += 1
 
         # 如果没有人物，返回空图谱
@@ -41,25 +41,34 @@ class GraphGenerator:
                 'relation_count': 0
             }
 
-        # 构建共现矩阵（段落共现原则）
-        cooccurrence_matrix = defaultdict(lambda: defaultdict(int))
+        # 使用 NetworkX 构建共现图
+        G = nx.Graph()
+
+        # 添加所有节点
+        for char in all_characters:
+            G.add_node(char)
+
+        # 添加边（段落共现原则）
+        edge_weights = defaultdict(int)
 
         for para in chapter_paragraphs:
             chars = para['characters']
+            # 同一段落中出现的人物两两连边
             for i in range(len(chars)):
                 for j in range(i + 1, len(chars)):
                     char1, char2 = sorted([chars[i], chars[j]])
-                    cooccurrence_matrix[char1][char2] += 1
+                    edge_key = (char1, char2)
+                    edge_weights[edge_key] += 1
+
+        # 将边添加到图中
+        for (char1, char2), weight in edge_weights.items():
+            G.add_edge(char1, char2, weight=weight)
 
         # 生成节点数据
         nodes = []
-        character_list = list(all_characters.keys())
-
-        for char in character_list:
-            degree = sum(1 for other in cooccurrence_matrix[char] if cooccurrence_matrix[char][other] > 0)
-            degree += sum(1 for other_char in cooccurrence_matrix
-                         if char in cooccurrence_matrix[other_char] and cooccurrence_matrix[other_char][char] > 0)
-
+        for char in all_characters:
+            # 计算人物的度（连接数）
+            degree = G.degree[char]
             appear_count = character_appear_count[char]
 
             nodes.append({
@@ -72,26 +81,21 @@ class GraphGenerator:
 
         # 生成边数据
         links = []
-        processed_pairs = set()
-
-        for char1 in cooccurrence_matrix:
-            for char2, weight in cooccurrence_matrix[char1].items():
-                pair = tuple(sorted([char1, char2]))
-                if pair not in processed_pairs and weight > 0:
-                    links.append({
-                        'source': char1,
-                        'target': char2,
-                        'value': weight,
-                        'weight': weight
-                    })
-                    processed_pairs.add(pair)
+        for u, v, data in G.edges(data=True):
+            links.append({
+                'source': u,
+                'target': v,
+                'value': data.get('weight', 1),
+                'weight': data.get('weight', 1)
+            })
 
         return {
             'nodes': nodes,
             'links': links,
             'chapter_index': chapter_idx,
             'character_count': len(nodes),
-            'relation_count': len(links)
+            'relation_count': len(links),
+            'networkx_graph': G  # 保留 NetworkX 图对象供后续分析使用
         }
 
     def apply_faction_colors(self, graph_data, faction_colors):
@@ -127,6 +131,11 @@ class GraphGenerator:
             })
 
         graph_data['links'] = colored_links
+
+        # 移除 NetworkX 图对象（不传递给前端）
+        if 'networkx_graph' in graph_data:
+            del graph_data['networkx_graph']
+
         return graph_data
 
     def _get_faction_color(self, faction_id):

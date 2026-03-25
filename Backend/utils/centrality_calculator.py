@@ -1,3 +1,5 @@
+import networkx as nx
+
 class CentralityCalculator:
     def __init__(self):
         pass
@@ -24,7 +26,7 @@ class CentralityCalculator:
 
     def calculate_degree_centrality(self, graph_data):
         """
-        计算图谱中每个人物的度中心性
+        使用 NetworkX 计算图谱中每个人物的度中心性
 
         Args:
             graph_data: ECharts 图谱数据
@@ -35,28 +37,25 @@ class CentralityCalculator:
         nodes = graph_data.get('nodes', [])
         links = graph_data.get('links', [])
 
-        centrality = {}
+        if not nodes:
+            return {}
 
-        # 初始化所有人的度为 0
+        # 构建 NetworkX 图
+        G = nx.Graph()
+
+        # 添加节点
         for node in nodes:
-            centrality[node['name']] = 0
+            G.add_node(node['name'])
 
-        # 统计每个人的连接数
+        # 添加边
         for link in links:
             source = link['source']
             target = link['target']
+            weight = link.get('value', 1)
+            G.add_edge(source, target, weight=weight)
 
-            if source in centrality:
-                centrality[source] += 1
-            if target in centrality:
-                centrality[target] += 1
+        # 使用 NetworkX 计算度中心性（已归一化）
+        degree_centrality = nx.degree_centrality(G)
 
-        # 归一化（可选）
-        if nodes:
-            n = len(nodes)
-            if n > 1:
-                max_possible_degree = n - 1
-                for name in centrality:
-                    centrality[name] = centrality[name] / max_possible_degree
+        return degree_centrality
 
-        return centrality

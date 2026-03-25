@@ -1,3 +1,4 @@
+import networkx as nx
 from collections import defaultdict
 
 class FactionAnalyzer:
@@ -26,56 +27,39 @@ class FactionAnalyzer:
         if not nodes:
             return {}
 
-        # 构建邻接表（只保留高频互动）
-        adjacency = defaultdict(set)
+        # 使用 NetworkX 构建图
+        G = nx.Graph()
 
+        # 添加所有节点
+        for node in nodes:
+            G.add_node(node['name'])
+
+        # 添加边（只保留高频互动）
         for link in links:
             source = link['source']
             target = link['target']
             weight = link.get('value', 1)
 
-            # 只有互动次数超过阈值才认为是同一阵营
+            # 只有互动次数超过阈值才添加边
             if weight >= self.threshold:
-                adjacency[source].add(target)
-                adjacency[target].add(source)
+                G.add_edge(source, target, weight=weight)
 
-        # 使用并查集或 DFS 找出连通分量（阵营）
+        # 使用 NetworkX 的连通分量算法找出阵营
         factions = {}
-        visited = set()
         faction_id = 0
 
-        all_characters = {node['name'] for node in nodes}
+        # connected_components 返回所有连通分量
+        for component in nx.connected_components(G):
+            faction_members = list(component)
 
-        for character in all_characters:
-            if character not in visited:
-                # 从该人物开始 DFS，找出所有连通的人物
-                faction_members = self._dfs_faction(character, adjacency, visited)
-
-                # 只有阵营人数>=2 才分配颜色
-                if len(faction_members) >= 2:
-                    factions[faction_id] = faction_members
-                    faction_id += 1
-                else:
-                    # 单独的人物也标记为一个阵营（用于后续处理）
-                    factions[faction_id] = faction_members
-                    faction_id += 1
+            # 只有阵营人数>=2 才分配颜色
+            if len(faction_members) >= 2:
+                factions[faction_id] = faction_members
+                faction_id += 1
+            else:
+                # 单独的人物也标记为一个阵营
+                factions[faction_id] = faction_members
+                faction_id += 1
 
         return factions
 
-    def _dfs_faction(self, start_node, adjacency, visited):
-        """使用 DFS 找出连通的所有人物"""
-        faction = []
-        stack = [start_node]
-
-        while stack:
-            node = stack.pop()
-            if node not in visited:
-                visited.add(node)
-                faction.append(node)
-
-                # 添加相邻节点
-                for neighbor in adjacency[node]:
-                    if neighbor not in visited:
-                        stack.append(neighbor)
-
-        return faction
