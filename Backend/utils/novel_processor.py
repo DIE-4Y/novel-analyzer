@@ -214,7 +214,7 @@ class NovelProcessor:
         return paragraphs_info
 
     def find_character_quotes(self, content, character_name, chapter_idx, paragraphs_info):
-        """查找人物在指定章节的相关语句"""
+        """查找人物在指定章节的相关语句（不限制数量）"""
         quotes = []
 
         chapter_paragraphs = [
@@ -222,7 +222,8 @@ class NovelProcessor:
             if p['chapter_index'] == chapter_idx and character_name in p['characters']
         ]
 
-        for para_info in chapter_paragraphs[:10]:
+        # 返回该人物在当前章节出现的所有句子，不限制数量
+        for para_info in chapter_paragraphs:
             quotes.append({
                 'text': para_info['text'],
                 'paragraph_index': para_info['paragraph_index']
