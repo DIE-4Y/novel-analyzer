@@ -27,7 +27,7 @@ processed_data = {
 processor = NovelProcessor()
 graph_generator = GraphGenerator()
 centrality_calc = CentralityCalculator()
-faction_analyzer = FactionAnalyzer(threshold=Config.FACTION_THRESHOLD)
+faction_analyzer = FactionAnalyzer(threshold=Config.FACTION_THRESHOLD, use_louvain=True)
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
@@ -59,8 +59,10 @@ def upload_file():
         processed_data['characters'] = result['characters']
         processed_data['paragraphs_info'] = result['paragraphs_info']
 
+        # 使用 NetworkX 度中心性计算主角
         main_chars = centrality_calc.calculate_main_characters(
             result['characters'],
+            result['paragraphs_info'],
             top_n=10
         )
         processed_data['main_characters'] = main_chars
@@ -73,6 +75,7 @@ def upload_file():
                 result['paragraphs_info']
             )
 
+            # 使用 NetworkX 社区发现算法分析阵营
             faction_colors = faction_analyzer.analyze_factions(graph_data)
             graph_data_with_colors = graph_generator.apply_faction_colors(graph_data, faction_colors)
 
@@ -107,6 +110,7 @@ def get_chapter_graph(chapter_idx):
             processed_data['paragraphs_info']
         )
 
+        # 使用 NetworkX 社区发现算法分析阵营
         faction_colors = faction_analyzer.analyze_factions(graph_data)
         graph_data_with_colors = graph_generator.apply_faction_colors(graph_data, faction_colors)
 
@@ -149,7 +153,7 @@ def get_character_quotes(character_name):
 
 @app.route('/api/main-characters', methods=['GET'])
 def get_main_characters():
-    """获取主角列表（度中心性最高的角色）"""
+    """获取主角列表（使用 NetworkX 度中心性计算）"""
     if processed_data['main_characters'] is None:
         return jsonify({'error': '请先上传文件'}), 400
 
