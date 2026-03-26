@@ -46,10 +46,11 @@ class NovelProcessor:
         """处理小说文件，提取人物和章节信息"""
         content = self._read_file(filepath)
 
-        characters = self._extract_characters(content)
+        characters_initial = self._extract_characters(content)
 
-        high_freq_chars = [name for name, count in characters.items() if count >= 5]
-        self.add_characters_to_dict(high_freq_chars)
+        high_freq_chars = [name for name, count in characters_initial.items() if count >= 5]
+        if high_freq_chars:
+            self.add_characters_to_dict(high_freq_chars)
 
         characters = self._extract_characters(content)
 
@@ -120,8 +121,68 @@ class NovelProcessor:
         except Exception as e:
             raise Exception(f"PDF 读取失败：{str(e)}")
 
+    def _is_valid_character_name(self, name):
+        """
+        判断是否是有效的人名
+
+        Args:
+            name: 待判断的名称
+
+        Returns:
+            bool: 是否为有效人名
+        """
+        # 1. 长度检查：中文人名通常 2-4 个字，允许 1-5 个字的范围
+        if len(name) < 1 or len(name) > 5:
+            return False
+
+        # 2. 排除纯标点符号
+        if re.match(r'^[\W_]+$', name):
+            return False
+
+        # 3. 排除常见标点符号组合
+        invalid_patterns = [
+            r'^[.,!?;:,.!?.]*$',  # 纯标点
+            r'^[""\']+$',  # 纯引号
+            r'^[()（）]+$',  # 纯括号
+            r'^[……—～`·]+$',  # 特殊标点
+        ]
+        for pattern in invalid_patterns:
+            if re.match(pattern, name):
+                return False
+
+        # 4. 排除常见语气词和助词
+        invalid_words = {
+            '了', '的', '吗', '呢', '吧', '啊', '呀', '哦', '嗯', '哎',
+            '嘛', '啦', '呗', '咯', '哈', '嘿', '哇', '噻', '嘟', '呐'
+        }
+        if name in invalid_words:
+            return False
+
+        # 5. 排除常见代词和称谓（非人名）
+        invalid_pronouns = {
+            '我', '你', '他', '她', '它', '咱', '您', '这', '那',
+            '谁', '啥', '何', '某', '其', '此', '彼'
+        }
+        if name in invalid_pronouns:
+            return False
+
+        # 6. 排除数字或字母开头的（通常是编号不是人名）
+        if re.match(r'^[0-9a-zA-Z]', name):
+            return False
+
+        # 7. 排除包含非中文字符的（除非是少数民族名字）
+        # 允许纯中文或中间有点（·）的名字
+        if not re.match(r'^[\u4e00-\u9fa5]+([·][\u4e00-\u9fa5]+)*$', name):
+            return False
+
+        # 8. 排除重复字符（如"啊啊啊"、"哈哈哈"）
+        if len(set(name)) == 1 and len(name) > 1:
+            return False
+
+        return True
+
     def _extract_characters(self, content):
-        """提取全文人物并统计出现次数"""
+        """提取全文人物并统计出现次数（带过滤）"""
         characters = {}
 
         paragraphs = content.split('\n')
@@ -135,7 +196,9 @@ class NovelProcessor:
 
             for word, flag in words:
                 if flag in ['nr', 'nrf']:
-                    characters[word] = characters.get(word, 0) + 1
+                    # 通过有效性检查才计入
+                    if self._is_valid_character_name(word):
+                        characters[word] = characters.get(word, 0) + 1
 
         return characters
 
@@ -183,7 +246,7 @@ class NovelProcessor:
 
 
     def _analyze_paragraphs(self, content, chapters):
-        """分析每个段落的人物信息，用于共现计算"""
+        """分析每个段落的人物信息，用于共现计算（带过滤）"""
         paragraphs_info = []
 
         for chapter in chapters:
@@ -201,7 +264,9 @@ class NovelProcessor:
 
                 for word, flag in words:
                     if flag in ['nr', 'nrf']:
-                        chars_in_para.add(word)
+                        # 通过有效性检查才计入
+                        if self._is_valid_character_name(word):
+                            chars_in_para.add(word)
 
                 if chars_in_para:
                     paragraphs_info.append({
