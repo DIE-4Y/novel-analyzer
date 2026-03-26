@@ -73,9 +73,11 @@ export default {
             if (params.dataType === 'node') {
               const appearCount = params.data.appearCount || 0
               const degree = params.data.value || 0
+              const factionName = params.data.factionName || '未知阵营'
               return `<strong>${params.name}</strong><br/>
                       出现次数：${appearCount}<br/>
-                      关联人物：${degree}`
+                      关联人物：${degree}<br/>
+                      所属阵营：${factionName}`
             } else if (params.dataType === 'edge') {
               return `${params.data.source} ↔ ${params.data.target}<br/>互动次数：${params.data.value || 0}`
             }

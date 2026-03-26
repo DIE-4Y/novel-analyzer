@@ -27,7 +27,8 @@ processed_data = {
 processor = NovelProcessor()
 graph_generator = GraphGenerator()
 centrality_calc = CentralityCalculator()
-faction_analyzer = FactionAnalyzer(threshold=Config.FACTION_THRESHOLD, use_louvain=True)
+# 使用 threshold=1，表示只要有互动就认为可能属于同一阵营
+faction_analyzer = FactionAnalyzer(threshold=1, use_louvain=True)
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
@@ -59,7 +60,6 @@ def upload_file():
         processed_data['characters'] = result['characters']
         processed_data['paragraphs_info'] = result['paragraphs_info']
 
-        # 使用 NetworkX 度中心性计算主角
         main_chars = centrality_calc.calculate_main_characters(
             result['characters'],
             result['paragraphs_info'],

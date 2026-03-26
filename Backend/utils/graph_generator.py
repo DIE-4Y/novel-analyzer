@@ -95,20 +95,45 @@ class GraphGenerator:
             'chapter_index': chapter_idx,
             'character_count': len(nodes),
             'relation_count': len(links),
-            'networkx_graph': G  # 保留 NetworkX 图对象供后续分析使用
+            'networkx_graph': G
         }
 
     def apply_faction_colors(self, graph_data, faction_colors):
         """
-        为图谱应用阵营颜色
+        为图谱应用阵营颜色，并在节点上标记阵营信息
 
         Args:
             graph_data: 图谱数据
-            faction_colors: 阵营颜色字典
+            faction_colors: 阵营字典 {faction_id: [character_names]}
 
         Returns:
             带颜色的图谱数据
         """
+        # 创建人物到阵营的映射
+        character_to_faction = {}
+        for faction_id, members in faction_colors.items():
+            for member in members:
+                character_to_faction[member] = faction_id
+
+        # 为节点添加阵营信息
+        colored_nodes = []
+        for node in graph_data['nodes']:
+            faction_id = character_to_faction.get(node['name'], -1)
+            faction_name = f"阵营{faction_id + 1}" if faction_id >= 0 else "无阵营"
+
+            colored_nodes.append({
+                'name': node['name'],
+                'symbolSize': node['symbolSize'],
+                'value': node['value'],
+                'appearCount': node['appearCount'],
+                'draggable': node['draggable'],
+                'factionId': faction_id,
+                'factionName': faction_name
+            })
+
+        graph_data['nodes'] = colored_nodes
+
+        # 为边分配颜色
         colored_links = []
         for link in graph_data['links']:
             source = link['source']
@@ -142,7 +167,9 @@ class GraphGenerator:
         """获取阵营颜色"""
         colors = [
             '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
-            '#98D8C8', '#F7DC6F', '#BB8FCE', '#F1948A'
+            '#98D8C8', '#F7DC6F', '#BB8FCE', '#F1948A',
+            '#95A5A6', '#E74C3C', '#3498DB', '#2ECC71',
+            '#F39C12', '#9B59B6', '#1ABC9C', '#D35400'
         ]
         return colors[faction_id % len(colors)]
 
