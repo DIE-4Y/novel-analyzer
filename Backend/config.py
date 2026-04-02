@@ -1,7 +1,7 @@
 import os
 
 class Config:
-    # 上传文件夹路径
+    # 上传文件夹路径（改回项目当前目录的 uploads 文件夹）
     UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), 'uploads')
 
     # 最大上传文件大小 16MB
@@ -19,3 +19,10 @@ class Config:
 
     # 度中心性计算
     TOP_MAIN_CHARACTERS = 10  # 返回前 10 个主角
+
+    # 自定义词典文件路径
+    CUSTOM_DICT_FILE = os.path.join(os.path.dirname(__file__), 'custom_dict.txt')
+
+    # 临时文件保留时间（秒），默认 1 小时
+    TEMP_FILE_LIFETIME = 3600
+
