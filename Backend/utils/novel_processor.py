@@ -2,6 +2,7 @@ import os
 import re
 from tqdm import tqdm
 from pyhanlp import *
+from Backend.config import Config
 
 class NovelProcessor:
     def __init__(self, analyzer_type="Perceptron", custom_dict=True):
@@ -24,6 +25,109 @@ class NovelProcessor:
             self.analyzer = self.CRFLAnalyzer.enableCustomDictionary(custom_dict)
 
         self.paragraphs_info = []
+
+        # 加载自定义词典
+        self._load_custom_dictionary()
+
+    def _load_custom_dictionary(self):
+        """加载自定义词典文件"""
+        try:
+            if os.path.exists(Config.CUSTOM_DICT_FILE):
+                with open(Config.CUSTOM_DICT_FILE, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        name = line.strip()
+                        if name and len(name) > 0:
+                            CustomDictionary.add(name, "nr 1000 ")
+        except Exception as e:
+            print(f"加载自定义词典失败：{e}")
+
+    @staticmethod
+    def add_to_custom_dict(names):
+        """
+        静态方法：添加人物到自定义词典
+
+        Args:
+            names: 人物名称列表
+        """
+        for name in names:
+            name = name.strip()
+            if name:
+                if CustomDictionary.get(name) is None:
+                    CustomDictionary.add(name, "nr 1000 ")
+                else:
+                    attr = "nr 1000 " + str(CustomDictionary.get(name))
+                    CustomDictionary.insert(name, attr)
+
+    @staticmethod
+    def save_custom_dict(names):
+        """
+        静态方法：保存自定义词典到文件
+
+        Args:
+            names: 人物名称列表
+        """
+        try:
+            existing_names = set()
+            if os.path.exists(Config.CUSTOM_DICT_FILE):
+                with open(Config.CUSTOM_DICT_FILE, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        existing_names.add(line.strip())
+
+            all_names = existing_names | set(name.strip() for name in names if name.strip())
+
+            with open(Config.CUSTOM_DICT_FILE, 'w', encoding='utf-8') as f:
+                for name in sorted(all_names):
+                    if name:
+                        f.write(name + '\n')
+
+            return True
+        except Exception as e:
+            print(f"保存自定义词典失败：{e}")
+            return False
+
+    @staticmethod
+    def get_custom_dict():
+        """
+        静态方法：获取自定义词典中的所有人物
+
+        Returns:
+            人物名称列表
+        """
+        try:
+            if os.path.exists(Config.CUSTOM_DICT_FILE):
+                with open(Config.CUSTOM_DICT_FILE, 'r', encoding='utf-8') as f:
+                    return [line.strip() for line in f if line.strip()]
+            return []
+        except Exception as e:
+            print(f"读取自定义词典失败：{e}")
+            return []
+
+    @staticmethod
+    def remove_from_custom_dict(names):
+        """
+        静态方法：从自定义词典中删除人物
+
+        Args:
+            names: 人物名称列表
+        """
+        try:
+            existing_names = set()
+            if os.path.exists(Config.CUSTOM_DICT_FILE):
+                with open(Config.CUSTOM_DICT_FILE, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        existing_names.add(line.strip())
+
+            new_names = existing_names - set(name.strip() for name in names if name.strip())
+
+            with open(Config.CUSTOM_DICT_FILE, 'w', encoding='utf-8') as f:
+                for name in sorted(new_names):
+                    if name:
+                        f.write(name + '\n')
+
+            return True
+        except Exception as e:
+            print(f"删除自定义词典失败：{e}")
+            return False
 
     def add_characters_to_dict(self, names_list):
         """添加人物到自定义词典"""
@@ -123,7 +227,7 @@ class NovelProcessor:
 
     def _is_valid_character_name(self, name):
         """
-        判断是否是有效的人名
+        判断是否是有效的人名（增强版）
 
         Args:
             name: 待判断的名称
@@ -131,8 +235,8 @@ class NovelProcessor:
         Returns:
             bool: 是否为有效人名
         """
-        # 1. 长度检查：中文人名通常 2-4 个字，允许 1-5 个字的范围
-        if len(name) < 1 or len(name) > 5:
+        # 1. 长度检查：排除长度小于 2 的字符
+        if len(name) < 2 or len(name) > 5:
             return False
 
         # 2. 排除纯标点符号
@@ -141,10 +245,10 @@ class NovelProcessor:
 
         # 3. 排除常见标点符号组合
         invalid_patterns = [
-            r'^[.,!?;:,.!?.]*$',  # 纯标点
-            r'^[""\']+$',  # 纯引号
-            r'^[()（）]+$',  # 纯括号
-            r'^[……—～`·]+$',  # 特殊标点
+            r'^[.,!?;:,.!?.]*$',
+            r'^[""\']+$',
+            r'^[()（）]+$',
+            r'^[……—～`·]+$',
         ]
         for pattern in invalid_patterns:
             if re.match(pattern, name):
@@ -166,18 +270,54 @@ class NovelProcessor:
         if name in invalid_pronouns:
             return False
 
-        # 6. 排除数字或字母开头的（通常是编号不是人名）
+        # 6. 排除数字或字母开头的
         if re.match(r'^[0-9a-zA-Z]', name):
             return False
 
         # 7. 排除包含非中文字符的（除非是少数民族名字）
-        # 允许纯中文或中间有点（·）的名字
         if not re.match(r'^[\u4e00-\u9fa5]+([·][\u4e00-\u9fa5]+)*$', name):
             return False
 
         # 8. 排除重复字符（如"啊啊啊"、"哈哈哈"）
         if len(set(name)) == 1 and len(name) > 1:
             return False
+
+        # 9. 【新增】排除明显非人名的噪声词
+        noise_words = {
+            # 泛指类
+            '某人', '有人', '众人', '人人', '人人', '人们', '人家',
+            '群众', '百姓', '民众', '平民', '凡人', '俗人',
+            '大家', '各位', '诸位', '列位', '各位',
+            '他们', '她们', '它们', '咱们', '我们', '你们',
+
+            # 身份类（非具体人名）
+            '路人', '行人', '旁人', '他人', '外人', '生人',
+            '看客', '观众', '听众', '读者', '作者',
+            '角色', '人物', '主角', '配角', '反派',
+
+            # 称呼类（非具体人名）
+            '大人', '小人', '官人', '老爷', '少爷', '小姐',
+            '夫人', '太太', '奶奶', '姥姥', '爷爷',
+            '师父', '师傅', '徒弟', '弟子', '门人',
+            '长老', '前辈', '后辈', '高人', '奇人',
+            '神仙', '仙人', '妖怪', '魔鬼', '鬼怪',
+
+            # 其他噪声
+            '无名', '无名氏', '佚名', '未知', '神秘人',
+            '一个人', '一个人影', '一道声音', '一个声音',
+            '一个老者', '一个中年', '一个青年', '一个少年',
+            '一个女子', '一个男子', '一个女人', '一个男人',
+            '一位', '这名', '那位', '这个', '那个',
+        }
+
+        if name in noise_words:
+            return False
+
+        # 10. 排除包含"人"字但不是人名的词
+        if '人' in name and len(name) == 2:
+            # 特殊情况：允许"某人"这种已经被上面排除的，但防止漏网
+            if name != '某人' and name.endswith('人'):
+                return False
 
         return True
 
@@ -196,7 +336,6 @@ class NovelProcessor:
 
             for word, flag in words:
                 if flag in ['nr', 'nrf']:
-                    # 通过有效性检查才计入
                     if self._is_valid_character_name(word):
                         characters[word] = characters.get(word, 0) + 1
 
@@ -264,7 +403,6 @@ class NovelProcessor:
 
                 for word, flag in words:
                     if flag in ['nr', 'nrf']:
-                        # 通过有效性检查才计入
                         if self._is_valid_character_name(word):
                             chars_in_para.add(word)
 
@@ -287,7 +425,6 @@ class NovelProcessor:
             if p['chapter_index'] == chapter_idx and character_name in p['characters']
         ]
 
-        # 返回该人物在当前章节出现的所有句子，不限制数量
         for para_info in chapter_paragraphs:
             quotes.append({
                 'text': para_info['text'],
