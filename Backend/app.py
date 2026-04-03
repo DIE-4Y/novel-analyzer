@@ -79,28 +79,25 @@ def upload_file():
     if not allowed_file(file.filename):
         return jsonify({'error': '不支持的文件格式，仅支持 txt 和 pdf'}), 400
 
-    # 生成唯一的临时文件名
-    timestamp = int(time.time())
-    original_filename = secure_filename(file.filename)
-    temp_filename = f"temp_{timestamp}_{original_filename}"
-    temp_filepath = os.path.join(app.config['UPLOAD_FOLDER'], temp_filename)
+    # 使用临时文件而不是永久存储
+    import tempfile
+    temp_fd, filepath = tempfile.mkstemp(suffix='.' + file.filename.rsplit('.', 1)[1].lower())
 
     try:
-        # 保存为临时文件
-        file.save(temp_filepath)
+        file.save(filepath)
 
-        # 预处理小说，提取人物
-        result = processor.process_novel(temp_filepath)
+        result = processor.process_novel(filepath)
 
-        # 存储处理结果
+        if not result['content'] or len(result['content'].strip()) == 0:
+            return jsonify({
+                'error': '无法从文件中提取有效文本内容，请检查文件是否为纯图片 PDF'
+            }), 400
+
         processed_data['novel_content'] = result['content']
         processed_data['chapters'] = result['chapters']
         processed_data['characters'] = result['characters']
         processed_data['paragraphs_info'] = result['paragraphs_info']
-        processed_data['temp_file_path'] = temp_filepath
-        processed_data['upload_time'] = time.time()
 
-        # 计算度中心性，找出主角
         main_chars = centrality_calc.calculate_main_characters(
             result['characters'],
             result['paragraphs_info'],
@@ -108,7 +105,6 @@ def upload_file():
         )
         processed_data['main_characters'] = main_chars
 
-        # 生成第一章的人物关系图谱
         if len(result['chapters']) > 0:
             first_chapter_idx = result['chapter_indices'][0]
             graph_data = graph_generator.generate_chapter_graph(
@@ -117,7 +113,6 @@ def upload_file():
                 result['paragraphs_info']
             )
 
-            # 阵营分析并为连线着色
             faction_colors = faction_analyzer.analyze_factions(graph_data)
             graph_data_with_colors = graph_generator.apply_faction_colors(graph_data, faction_colors)
 
@@ -132,21 +127,21 @@ def upload_file():
                 'graph_data': graph_data_with_colors
             })
         else:
-            # 处理失败，删除临时文件
-            if os.path.exists(temp_filepath):
-                os.remove(temp_filepath)
             return jsonify({'error': '未找到章节'}), 400
 
     except Exception as e:
         import traceback
         traceback.print_exc()
-        # 发生错误时删除临时文件
-        if os.path.exists(temp_filepath):
-            try:
-                os.remove(temp_filepath)
-            except:
-                pass
         return jsonify({'error': f'处理失败：{str(e)}'}), 500
+
+    finally:
+        # 处理完成后删除临时文件
+        try:
+            os.close(temp_fd)
+            os.unlink(filepath)
+        except:
+            pass
+
 
 @app.route('/api/chapter/<int:chapter_idx>', methods=['GET'])
 def get_chapter_graph(chapter_idx):
