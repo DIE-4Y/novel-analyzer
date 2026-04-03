@@ -34,38 +34,6 @@ graph_generator = GraphGenerator()
 centrality_calc = CentralityCalculator()
 faction_analyzer = FactionAnalyzer(threshold=1, use_louvain=True)
 
-
-def cleanup_temp_files():
-    """清理过期的临时文件"""
-    try:
-        current_time = time.time()
-        lifetime = Config.TEMP_FILE_LIFETIME
-
-        if os.path.exists(Config.UPLOAD_FOLDER):
-            for filename in os.listdir(Config.UPLOAD_FOLDER):
-                file_path = os.path.join(Config.UPLOAD_FOLDER, filename)
-                try:
-                    file_mtime = os.path.getmtime(file_path)
-                    if current_time - file_mtime > lifetime:
-                        os.remove(file_path)
-                        print(f"已清理过期临时文件：{filename}")
-                except Exception as e:
-                    print(f"清理文件失败 {filename}: {e}")
-    except Exception as e:
-        print(f"清理临时文件失败：{e}")
-
-
-def periodic_cleanup():
-    """定期清理临时文件（每 30 分钟运行一次）"""
-    while True:
-        time.sleep(1800)  # 30 分钟
-        cleanup_temp_files()
-
-
-# 启动后台清理线程
-cleanup_thread = threading.Thread(target=periodic_cleanup, daemon=True)
-cleanup_thread.start()
-
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
     """处理文件上传"""
@@ -266,17 +234,6 @@ def remove_from_custom_dict():
     except Exception as e:
         return jsonify({'error': f'删除自定义词典失败：{str(e)}'}), 500
 
-@app.route('/api/cleanup', methods=['POST'])
-def cleanup():
-    """手动触发清理临时文件"""
-    try:
-        cleanup_temp_files()
-        return jsonify({
-            'success': True,
-            'message': '临时文件清理完成'
-        })
-    except Exception as e:
-        return jsonify({'error': f'清理失败：{str(e)}'}), 500
 
 def allowed_file(filename):
     """检查文件类型是否允许"""
@@ -284,8 +241,6 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in allowed_extensions
 
-# 应用启动时清理一次过期文件
-cleanup_temp_files()
 
 if __name__ == '__main__':
     app.run(debug=False, host='0.0.0.0', port=5000)
