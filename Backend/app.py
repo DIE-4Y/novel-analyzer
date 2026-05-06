@@ -6,6 +6,8 @@ import shutil
 import time
 import threading
 from werkzeug.utils import secure_filename
+
+from Backend import config
 from utils.novel_processor import NovelProcessor
 from utils.graph_generator import GraphGenerator
 from utils.centrality_calculator import CentralityCalculator
@@ -32,7 +34,7 @@ processed_data = {
 processor = NovelProcessor()
 graph_generator = GraphGenerator()
 centrality_calc = CentralityCalculator()
-faction_analyzer = FactionAnalyzer(threshold=1, use_louvain=True)
+faction_analyzer = FactionAnalyzer(Config.FACTION_THRESHOLD, use_louvain=True)
 
 @app.route('/api/upload', methods=['POST'])
 def upload_file():
@@ -69,7 +71,7 @@ def upload_file():
         main_chars = centrality_calc.calculate_main_characters(
             result['characters'],
             result['paragraphs_info'],
-            top_n=10
+            top_n=Config.TOP_MAIN_CHARACTERS
         )
         processed_data['main_characters'] = main_chars
 

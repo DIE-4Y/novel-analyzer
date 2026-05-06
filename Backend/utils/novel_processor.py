@@ -152,7 +152,7 @@ class NovelProcessor:
 
         characters_initial = self._extract_characters(content)
 
-        high_freq_chars = [name for name, count in characters_initial.items() if count >= 5]
+        high_freq_chars = [name for name, count in characters_initial.items() if count >= Config.CHARACTER_THRESHOLD]
         if high_freq_chars:
             self.add_characters_to_dict(high_freq_chars)
 
