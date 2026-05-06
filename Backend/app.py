@@ -76,7 +76,6 @@ def upload_file():
         if len(result['chapters']) > 0:
             first_chapter_idx = result['chapter_indices'][0]
             graph_data = graph_generator.generate_chapter_graph(
-                result['content'],
                 first_chapter_idx,
                 result['paragraphs_info']
             )
@@ -120,7 +119,6 @@ def get_chapter_graph(chapter_idx):
     try:
         # 重新生成该章节的图谱
         graph_data = graph_generator.generate_chapter_graph(
-            processed_data['novel_content'],
             chapter_idx,
             processed_data['paragraphs_info']
         )

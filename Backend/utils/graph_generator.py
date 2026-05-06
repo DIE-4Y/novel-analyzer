@@ -5,12 +5,11 @@ class GraphGenerator:
     def __init__(self):
         pass
 
-    def generate_chapter_graph(self, content, chapter_idx, paragraphs_info):
+    def generate_chapter_graph(self, chapter_idx, paragraphs_info):
         """
         根据章节生成人物关系图谱数据
 
         Args:
-            content: 小说全文内容
             chapter_idx: 当前章节索引
             paragraphs_info: 段落信息列表
 
